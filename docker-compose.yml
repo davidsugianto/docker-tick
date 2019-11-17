@@ -46,7 +46,7 @@ services:
       - app-tier
 
   influxdb:
-    image: influxdb:latest
+    image: influxdb:1.7.9-alpine
     container_name: influxdb
     hostname: influxdb
     restart: always
