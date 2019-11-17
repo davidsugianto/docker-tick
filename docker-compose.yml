@@ -1,0 +1,97 @@
+---
+
+version: "3.1"
+
+networks:
+  app-tier:
+    driver: bridge
+
+services:
+  kapacitor:
+    image: kapacitor:1.5.3-alpine
+    container_name: kapacitor
+    hostname: kapacitor
+    restart: always
+    expose:
+      - '9092'
+    volumes:
+      - ./config/kapacitor.conf:/etc/kapacitor/kapacitor.conf:ro
+      - ./data/kapacitor/:/var/lib/kapacitor:ro
+    environment:
+      - 'TZ=${TIMEZONE}'
+      - KAPACITOR_HOSTNAME=${KAPACITOR_HOSTNAME}
+      - KAPACITOR_INFLUXDB_0_URLS_0=${KAPACITOR_INFLUXDB_0_URLS_0}
+    depends_on:
+      - influxdb
+    networks:
+      - app-tier
+
+  chronograf:
+    image: chronograf:1.7.14-alpine
+    container_name: chronograf
+    hostname: chronograf
+    restart: always
+    expose:
+      - '8888'
+    volumes:
+      - ./data/chronograf/:/var/lib/chronograf:ro
+    environment:
+      - 'TZ=${TIMEZONE}'
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - KAPACITOR_URL=${KAPACITOR_URL}
+    depends_on:
+      - influxdb
+      - kapacitor
+    networks:
+      - app-tier
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    hostname: influxdb
+    restart: always
+    volumes:
+      - ./config/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+      - ./data/influxdb:/var/lib/influxdb:rw
+    environment:
+      - 'TZ=${TIMEZONE}'
+      - INFLUXDB_DB=${INFLUXDB_DATABASE}
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_USERNAME}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_PASSWORD}
+    expose:
+      - '8086'
+    depends_on:
+      - telegraf
+    networks:
+      - app-tier
+
+  telegraf:
+    image: telegraf:1.12.5-alpine
+    container_name: telegraf
+    hostname: telegraf
+    restart: always
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - 'TZ=${TIMEZONE}'
+    expose:
+      - '8094'
+    networks:
+      - app-tier
+
+  httpd:
+    container_name: nginx
+    image: bitnami/nginx:${NGINX_VERSION}-${OS_VERSION}
+    hostname: nginx
+    restart: always
+    environment:
+      - 'TZ=${TIMEZONE}'
+    networks:
+      - app-tier
+    ports:
+      - '80:8080'
+      - '443:443'
+    volumes:
+      - ./config/nginx/vhost:/opt/bitnami/nginx/conf/vhosts:ro
+      - ./logs/nginx:/opt/bitnami/nginx/logs:rw
